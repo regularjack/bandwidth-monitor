@@ -1,11 +1,8 @@
-install: venv setup
+generate: venv
 
 venv:
 	virtualenv venv
 	venv/bin/pip install -r requirements.txt
 
-gather:
-	venv/bin/python speed.py
-
-server:
+generate:
 	venv/bin/python app.py

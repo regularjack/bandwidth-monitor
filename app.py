@@ -1,94 +1,68 @@
-from flask import Flask, render_template
+from jinja2 import Template
 
 import json
-import sqlite3
 import datetime
 
 import plotly
 import plotly.graph_objs as go
 
+def scale(value):
+    return int(int(value.split('.')[0]) / 1000000)
 
-app = Flask(__name__)
-app.debug = True
+def main():
+    with open('speedtest.csv', 'rt') as file:
+        it = iter(file)
+        next(it)
+        rows = list(line.split(',') for line in it)
 
-def scale(s):
-    """Scale bandwidths in Bytes to MB."""
-    if s > 100:
-        return s // 1000000
-    return s
-
-@app.route('/')
-def index():
-    with sqlite3.connect('speedtest.db') as connection:
-        rows = connection.execute('SELECT * FROM RESULTS').fetchall()
-
-        x_axis_fast = [
-            datetime.datetime.fromtimestamp(r[1]) for r in rows
-            if r[0] == 'fast.com'
-        ]
-        x_axis_speed = [
-            datetime.datetime.fromtimestamp(r[1]) for r in rows
-            if r[0] != 'fast.com'
+        x_axis = [
+            datetime.datetime.strptime(r[3].split('.')[0], '%Y-%m-%dT%H:%M:%S') for r in rows
         ]
 
         graph = dict(
             data=[
                 go.Scatter(
-                    x = x_axis_fast,
+                    x = x_axis,
                     y = [
-                        scale(r[3]) for r in rows
-                        if r[0] == 'fast.com'
+                        scale(r[6]) for r in rows
                     ],
-                    mode = 'lines+markers',
-                    name = 'Download: fast.com'
+                    mode = 'lines',
+                    name = 'Download'
                 ),
                 go.Scatter(
-                    x = x_axis_speed,
+                    x = x_axis,
                     y = [
-                        scale(r[3]) for r in rows
-                        if r[0] != 'fast.com'
+                        scale(r[7]) for r in rows
                     ],
-                    mode = 'lines+markers',
-                    name = 'Download: speedtest-cli'
-                ),
-                go.Scatter(
-                    x = x_axis_speed,
-                    y = [
-                        scale(r[4]) for r in rows
-                        if r[0] != 'fast.com'
-                    ],
-                    mode = 'lines+markers',
+                    mode = 'lines',
                     name = 'Upload'
-                ),
-                go.Scatter(
-                    x = x_axis_speed,
-                    y = [
-                        r[2] for r in rows
-                        if r[0] != 'fast.com'
-                    ],
-                    mode = 'lines+markers',
-                    name = 'Ping'
                 )
             ],
             layout=dict(
                 title='Bandwidth',
                 yaxis=dict(
-                    title="Bandwidth"
+                    title="Bandwidth (Mb/s)"
                 ),
                 xaxis=dict(
-                    title="Time"
+                    title="Time",
+                    range=[
+                        datetime.datetime.now() - datetime.timedelta(days=14),
+                        datetime.datetime.now()
+                    ]
                 )
             )
         )
 
-        return render_template(
-            'layouts/index.html',
-            graph=json.dumps(
+        with open('templates/index.html.jinja2') as template_file:
+            template = Template(template_file.read())
+
+            html = template.render(graph=json.dumps(
                 graph,
                 cls=plotly.utils.PlotlyJSONEncoder
-            ),
-        )
+            ))
 
+            with open('index.html', 'w') as html_file:
+                html_file.write(html)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=9999)
+if __name__ == "__main__":
+    main()
