@@ -6,3 +6,6 @@ venv:
 
 generate:
 	venv/bin/python app.py
+
+test:
+	venv/bin/speedtest --csv >> speedtest.csv

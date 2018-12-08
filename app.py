@@ -53,7 +53,7 @@ def main():
             )
         )
 
-        with open('templates/index.html.jinja2') as template_file:
+        with open('index.html.jinja2') as template_file:
             template = Template(template_file.read())
 
             html = template.render(graph=json.dumps(
