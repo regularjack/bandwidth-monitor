@@ -1,41 +1,8 @@
-import json
 import speedtest
 import sqlite3
-import subprocess
 import time
 
-def fast():
-    # Start chromium in headless mode
-    ts = int(time.time())
-    proc = subprocess.Popen(
-        ['/usr/bin/chromium-browser', '--headless', '--repl', 'https://www.fast.com/'],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-
-    # Give time to the speed test to terminate
-    time.sleep(60)
-
-    try:
-        outs, errs = proc.communicate(
-            input='window.document.querySelector("#speed-value").textContent\nquit\n'.encode('utf-8'),
-            timeout=5,
-        )
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        outs, errs = proc.communicate()
-    else:
-        proc.terminate()
-
-    return {
-        'server': 'fast.com',
-        'ts': ts,
-        'ping': -1,
-        'download': int(json.loads(outs.decode('utf-8')[4:-5])['result']['value']),
-        'upload': -1,
-    }
-
-def speed():
+def run_speedtest():
     ts = int(time.time())
 
     servers = []
@@ -58,7 +25,26 @@ def speed():
     }
 
 def main():
-    with sqlite3.connect('speedtest.db') as connection:
+    with create_connection() as connection:
+        result = run_speedtest()
+
+        add_result(connection, result)
+
+def add_result(connection, result):
+    columns = ', '.join(result.keys())
+    placeholders = ':'+', :'.join(result.keys())
+
+    query = 'INSERT INTO results (%s) VALUES (%s)' % (columns, placeholders)
+
+    cursor = connection.cursor()
+    cursor.execute(query, result)
+
+    return cursor.lastrowid
+
+def create_connection():
+    try:
+        connection = sqlite3.connect('speedtest.db')
+
         connection.execute("""
             CREATE TABLE IF NOT EXISTS RESULTS(
                 server TEXT,
@@ -70,22 +56,11 @@ def main():
             )
         """)
 
-        # Start by measuring speedtest
-        speedtest_result = speed()
-        # Wait a few seconds
-        time.sleep(15)
-        # Measure using fast.com
-        fast_result = fast()
+        return connection
+    except Error as e:
+        print(e)
 
-        # Persist results
-        connection.executemany("""
-            INSERT INTO RESULTS VALUES (
-                :server,
-                :ts,
-                :ping,
-                :download,
-                :upload);
-            """, (speedtest_result, fast_result))
+    return None
 
 if __name__ == '__main__':
     main()
