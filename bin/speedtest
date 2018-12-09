@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+PROJECT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+PROJECT_HOME="$(dirname "$PROJECT_HOME")"
+
+cd $PROJECT_HOME
+
+make
+
+$PROJECT_HOME/venv/bin/speedtest --csv >> speedtest.csv
+
+$PROJECT_HOME/venv/bin/python app.py
